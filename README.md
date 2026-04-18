@@ -14,11 +14,11 @@ VO₂ is a widely studied material for smart window applications due to its reve
 
 <div align="justify">
 
-Given that existing methods to reduce the critical temperature of the metal–insulator transition (MIT) are complex and not yet suitable for large-scale industrial production, this raised the following question for Joaquim, a professor at UNIVASF:
+Given that existing methods to reduce the critical temperature of the metal–insulator transition (MIT) are complex and not yet suitable for large-scale industrial production, this raised the following question for `Joaquim Junior Isidio De Lima`, a professor at UNIVASF:
 
 <div align="justify">
 
-"Is it possible to design a multilayer structure containing VO₂ that exhibits the desired behavior of VO₂ in its insulating phase at a lower temperature, for example, 26 °C (78.8 °F)?"
+> Is it possible to design a multilayer structure containing VO₂ that exhibits the desired behavior of VO₂ in its insulating phase at a lower temperature, for example, 26 °C (78.8 °F)?
 
 <div align="justify">
 
