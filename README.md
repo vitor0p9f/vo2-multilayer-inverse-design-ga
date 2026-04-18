@@ -47,6 +47,21 @@ The methodology adopted in this research was based on the following steps:
 
 The implementation of the `GA` followed the standard approach, with the necessary operators adapted to operate correctly in this context.
 
+#### Phenotype Structure
+
+<div align="justify">
+
+In the context of a `GA`, a phenotype represents a solution to the problem. In this work, the phenotype is defined by the following structure:
+
+<div align="justify">
+
+- A gene representing the number of layers in the structure
+- A chromosome representing the arrangement of the layers in the structure
+
+<div align="justify">
+
+Inside the chromosome, a gene pair `(r, t)` is defined, where `r` represents the refractive index of the layer material at 26 °C (78.8 °F), and `t` represents the thickness of the material. Each pair `(r, t)` therefore defines a single layer in the structure.
+
 #### Initial Population Generation
 
 #### Fitness
