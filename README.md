@@ -90,9 +90,19 @@ Since the light spectrum can be divided into three main ranges, weights were ass
 
 #### Parents Selection
 
+<div align="justify">
+
 Parent selection was performed using tournament selection, in which a subset of the population is chosen through `k` tournaments with `n` participants each. The winner of each tournament is determined based on its fitness value.
 
 #### Crossover Operator
+
+<div align="justify">
+
+Due to the vector representation of the chromosome, the two-point crossover operator was applied. The same strategy was also used for the gene representing the number of layers.
+
+<div align="justify">
+
+Since the number of layers may differ between individuals, the crossover points were determined based on the parent with the smallest chromosome length.
 
 #### Mutation Operator
 
