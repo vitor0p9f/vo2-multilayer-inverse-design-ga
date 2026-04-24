@@ -128,7 +128,21 @@ The second operator mutates the chromosome that encodes the sequence of layers. 
 
 All mutation mechanism follows the same predefined mutation rate throughout the evolutionary process.
 
-### New Population Selection
+#### Genotype Consistency
+
+<div align="justify">
+
+Since the chromosome length depends on the gene that encodes the number of layers, genetic operators such as `crossover` and `mutation` may generate inconsistent individuals. To ensure a valid representation, a consistency adjustment is applied after these operators.
+
+<div align="justify">
+
+Whenever the number of layers differs from the chromosome length, the chromosome is automatically adjusted. If the number of layers increases, new valid (material, thickness) pairs are randomly generated and appended to the chromosome. If the number of layers decreases, the excess pairs are removed from the end of the chromosome.
+
+<div align="justify">
+
+This procedure guarantees that the chromosome length always matches the encoded number of layers.
+
+#### New Population Selection
 
 <div align="justify">
 
