@@ -106,6 +106,28 @@ Since the number of layers may differ between individuals, the crossover points 
 
 #### Mutation Operator
 
+<div align="justify">
+
+To efficiently manage the mutation of an individual, two mutation operators were designed. Each operator targets a different component of the individual representation: the `gene` that encodes the `number of layers`, and the `chromosome` that encodes the `arrangement of layers`.
+
+<div align="justify">
+
+The first operator is a traditional `bit-flip mutation` applied to a binary representation of the number of layers. In this operator, each bit of the binary gene is independently evaluated according to the mutation probability. Whenever a mutation occurs, the corresponding bit is flipped (0 → 1 or 1 → 0). This operator introduces structural variability by allowing the genetic algorithm to explore individuals with different numbers of layers.
+
+<div align="justify">
+
+The second operator mutates the chromosome that encodes the sequence of layers. Since each layer is represented as a pair `(material, thickness)`, the mutation operator is composed of multiple internal operations designed to explore different types of variation. These operations are applied sequentially in a cascade, meaning that the chromosome may undergo `none`, `one`, or `multiple` modifications during a mutation event. Three mutation mechanisms are used:
+
+<div align="justify">
+
+1. Layer swap operator: this operator randomly selects a range of positions in the chromosome and scrambles them. This allows the algorithm to explore different layer orderings without modifying their physical properties.
+2. Pair replacement operator: in this operator, each (material, thickness) pair in the chromosome is independently evaluated according to the mutation probability. When a mutation occurs, the corresponding pair is replaced with another randomly generated valid pair. This mutation introduces new layer compositions into the chromosome.
+3. Internal pair modification operator: this operator modifies the internal attributes of an existing pair. Two types of modifications can occur: material mutation, in which the material is replaced by another material randomly selected from the available material set, and thickness mutation, in which the thickness is perturbed by a small variation of up to ±5% of its value. Each element of the pair has an independent probability of undergoing mutation, meaning that the material, the thickness, or both may be modified. This type of mutation enables fine local adjustments in the solution space.
+
+<div align="justify">
+
+All mutation mechanism follows the same predefined mutation rate throughout the evolutionary process.
+
 ### New Population Selection
 
 <div align="justify">
