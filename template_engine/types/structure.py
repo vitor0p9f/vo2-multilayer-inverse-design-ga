@@ -1,9 +1,10 @@
-from dataclasses import dataclass
-from typing import Optional, Tuple
-
+import enum
 import jax
 import jax.numpy as jnp
+
+from dataclasses import dataclass
 from jax.tree_util import register_dataclass
+from typing import Optional, Tuple
 
 @register_dataclass
 @dataclass(frozen=True)
@@ -32,5 +33,17 @@ class FreeBlock:
 
 @register_dataclass
 @dataclass(frozen=True)
-class Structure:
+class StructureTemplate:
     layers: Tuple[Layer | FreeBlock]
+
+class Mapping(enum.IntEnum):
+    LAYER = enum.auto()
+    FREE_LAYER = enum.auto()
+    PARTIAL_LAYER_MISSING_MATERIAL = enum.auto()
+    PARTIAL_LAYER_MISSING_THICKNESS = enum.auto()
+
+    SUBSTRATE = enum.auto()
+    PARTIAL_SUBSTRATE_MISSING_MATERIAL = enum.auto()
+
+    INCIDENCE_MEDIUM = enum.auto()
+    PARTIAL_INCIDENCE_MEDIUM_MISSING_MATERIAL = enum.auto()
