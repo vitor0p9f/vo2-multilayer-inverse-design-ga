@@ -88,12 +88,6 @@ def create_layer_mapping(template: StructureTemplate, max_layers: int) -> Tuple[
     num_wildcards = len(wildcards)
 
     if num_wildcards == 0:
-        if remaining != 0:
-            raise ValueError(
-                f"Template without wildcards must have exactly {max_layers} layers, "
-                f"but contains {fixed_layers}."
-            )
-
         mapping = []
         for item in template.layers:
             if isinstance(item, FreeBlock) and item.number > 0:
@@ -126,7 +120,7 @@ def create_layer_mapping(template: StructureTemplate, max_layers: int) -> Tuple[
     if remaining < num_wildcards:
         raise ValueError(
             f"Remaining layers ({remaining}) are insufficient to distribute "
-            f"among {num_wildcards} wildcard(s) (each needs at least one layer)."
+            f"among {num_wildcards} FREEblock(s) (each needs at least one layer)."
         )
 
     base = remaining // num_wildcards
