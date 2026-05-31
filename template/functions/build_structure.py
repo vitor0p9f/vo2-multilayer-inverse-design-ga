@@ -151,8 +151,7 @@ def build_random_structure_from_template(
         if not free_thick_mask[i]:
             if layer.thickness_m is None:
                 raise ValueError(f"Fixed thickness at position {i} is None.")
-            # thickness is stored in meters in the Layer object; convert to µm for final array
-            final_thicknesses = final_thicknesses.at[i].set(layer.thickness_m * 1e6)
+            final_thicknesses = final_thicknesses.at[i].set(layer.thickness_m)
 
     # Overwrite free positions with random values
     final_materials = jnp.where(free_mat_mask, rand_mats, final_materials)
@@ -168,7 +167,7 @@ def build_random_structure_from_template(
     # ----- 7. Build and return Structure -----
     structure = Structure(
         materials=final_materials,
-        thicknesses_um=final_thicknesses,
+        thicknesses_m=final_thicknesses,
         active_mask=active_mask,
         free_thickness_mask=free_thick_mask,
         free_material_mask=free_mat_mask,

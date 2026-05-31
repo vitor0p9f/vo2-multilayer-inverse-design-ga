@@ -8,7 +8,7 @@ from jax.tree_util import register_dataclass
 @dataclass(frozen=True)
 class Structure:
     materials: Materials
-    thicknesses_um: Thicknesses
+    thicknesses_m: Thicknesses
     active_mask: Mask
     free_thickness_mask: Mask
     free_material_mask: Mask
