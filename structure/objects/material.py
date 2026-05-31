@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Tuple, Union
 from dataclasses import dataclass
 from pathlib import Path
 from jax.tree_util import register_dataclass
@@ -9,7 +9,10 @@ import re
 import jax.numpy as jnp
 import numpy as np
 
-PredictionFunction = Callable[["Material", float], Tuple[Wavelengths, N_values, K_values]]
+BatchPredictionFunction = Callable[
+    ["Material", jnp.ndarray],
+    Tuple[Tuple[Wavelengths, ...], Tuple[N_values, ...], Tuple[K_values, ...]]
+]
 
 @register_dataclass
 @dataclass(frozen=True)
@@ -29,14 +32,14 @@ class Material:
         symbol: Chemical symbol (used for file names).
         cte: Thermal expansion coefficient (1/K).
         files: Single Path or tuple of Paths to CSV files (assumed to contain wavelengths in µm).
-        temperatures: Tuple of temperatures (K) – automatically populated.
+        temperatures (property): Tuple of temperatures (K) for which data is available.
         database_dir: Directory for caching.
     """
     name: str
     symbol: str
     cte: float
     files: Union[Path, Tuple[Path, ...]] = ()
-    temperatures: Tuple[float, ...] = ()
+    _temperatures: Tuple[float] = ()
     database_dir: Path = Path("database")
 
     def __post_init__(self):
@@ -67,20 +70,13 @@ class Material:
 
             self._set_attrs(tuple(wl_list), tuple(n_list), tuple(k_list), temp_tuple)
             self._save_to_database()
-        else:
-            # No files provided – temperatures must already be set (used by from_prediction)
-            if not self.temperatures:
-                raise ValueError(
-                    "Either 'files' or 'temperatures' must be provided. "
-                    "Use .from_prediction() when no files are available."
-                )
 
     def _set_attrs(self, wl_tuple, n_tuple, k_tuple, temps_tuple):
         """Set internal attributes and determine if wavelength grid is common."""
         object.__setattr__(self, '_wavelengths', wl_tuple)   # each element in meters
         object.__setattr__(self, '_n_values', n_tuple)
         object.__setattr__(self, '_k_values', k_tuple)
-        object.__setattr__(self, 'temperatures', temps_tuple)
+        object.__setattr__(self, '_temperatures', temps_tuple)
         self._set_common_grid_flag()
 
     def _set_common_grid_flag(self):
@@ -95,6 +91,11 @@ class Material:
                 for wl in wl_list[1:]
             )
         object.__setattr__(self, '_is_common_grid', is_common)
+
+    @property
+    def temperatures(self) -> Tuple[float, ...]:
+        """Tuple of temperatures (K) for which optical data is available."""
+        return self._temperatures
 
     @staticmethod
     def _extract_temperature(filepath: Path) -> float:
@@ -130,7 +131,7 @@ class Material:
         csv_dir.mkdir(parents=True, exist_ok=True)
 
         # Save one CSV per temperature (wavelengths in meters, scientific notation)
-        for i, T in enumerate(self.temperatures):
+        for i, T in enumerate(self.temperatures):   # uses property
             wl = np.asarray(self._wavelengths[i])   # meters
             n = np.asarray(self._n_values[i])
             k = np.asarray(self._k_values[i])
@@ -195,32 +196,27 @@ class Material:
         """Always return a tuple of wavelength arrays (one per temperature)."""
         return self._wavelengths
 
-    def get_at_temperature(self, idx: int):
-        """Return (wavelengths, n, k) for the temperature at index `idx`."""
-        return self._wavelengths[idx], self._n_values[idx], self._k_values[idx]
-
-    def from_prediction(
+    def from_prediction_batch(
         self,
         target_temperatures: jnp.ndarray,
-        prediction_function: PredictionFunction,
+        batch_prediction_function: BatchPredictionFunction,
     ) -> "Material":
         """
-        Extend the current Material by predicting optical properties at new temperatures.
-
-        The original temperatures are kept, and new temperatures that are not already
-        present are added. The prediction function is called only for the new ones.
+        Extend the material using a batch prediction that computes all new
+        temperatures at once.
 
         Args:
-            target_temperatures: 1D array of temperatures (K) to predict (may include
-                                 temperatures that already exist – duplicates are ignored).
-            prediction_function: Function with signature:
-                prediction_function(material: Material, T: float) -> (wavelengths_m, n, k)
+            target_temperatures: 1D array of new temperatures (K). Duplicates already
+                                present in the material are ignored.
+            batch_prediction_function: A function that takes (material, temperatures_array)
+                                    and returns (wavelengths_tuple, n_tuple, k_tuple),
+                                    each with one element per requested temperature.
 
         Returns:
-            A new Material instance containing both original and predicted temperatures.
+            A new Material containing the original data plus the predicted data.
         """
-        # Convert to Python floats and filter out already existing temperatures
-        existing_set = set(self.temperatures)
+        # Filter out temperatures that already exist
+        existing_set = set(self.temperatures)   # property
         new_temps = []
         for T in target_temperatures:
             Tf = float(T)
@@ -228,37 +224,43 @@ class Material:
                 new_temps.append(Tf)
 
         if not new_temps:
-            # No new temperatures – return self (immutable, so it's fine)
             return self
 
-        # Predict for each new temperature
-        new_wl_list, new_n_list, new_k_list = [], [], []
-        for T in new_temps:
-            wl_m, n_arr, k_arr = prediction_function(self, T)
-            new_wl_list.append(jnp.asarray(wl_m, dtype=jnp.float32))
-            new_n_list.append(jnp.asarray(n_arr, dtype=jnp.float32))
-            new_k_list.append(jnp.asarray(k_arr, dtype=jnp.float32))
+        # Convert to JAX array
+        new_temps_arr = jnp.array(new_temps, dtype=jnp.float32)
 
-        # Combine old and new data
+        # Single batch call
+        wl_tuple, n_tuple, k_tuple = batch_prediction_function(self, new_temps_arr)
+
+        # Sanity check: lengths must match
+        assert len(wl_tuple) == len(new_temps), (
+            f"Batch function returned {len(wl_tuple)} wavelength groups, "
+            f"expected {len(new_temps)}."
+        )
+
+        # Combine with existing data
         combined_temps = tuple(list(self.temperatures) + new_temps)
-        combined_wl = self._wavelengths + tuple(new_wl_list)
-        combined_n  = self._n_values + tuple(new_n_list)
-        combined_k  = self._k_values + tuple(new_k_list)
+        combined_wl = self._wavelengths + tuple(wl_tuple)
+        combined_n  = self._n_values + tuple(n_tuple)
+        combined_k  = self._k_values + tuple(k_tuple)
 
-        # Create a new Material with the combined data
         new_material = Material(
             name=self.name,
             symbol=self.symbol,
             cte=self.cte,
-            files=(),                           # no CSV files – data passed directly
-            temperatures=combined_temps,
+            files=(),
             database_dir=self.database_dir,
         )
         new_material._set_attrs(combined_wl, combined_n, combined_k, combined_temps)
         new_material._save_to_database()
         return new_material
-    
-    def get_at_temperature(self, temperature: float, exact: bool = False, tol: float = 1e-6) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+
+    def get_data_by_temperature(
+        self,
+        temperature: float,
+        exact: bool = False,
+        tol: float = 1e-6
+    ) -> Tuple[Wavelengths, N_values, K_values]:
         """
         Return (wavelengths, n, k) for the given temperature.
 
@@ -271,11 +273,13 @@ class Material:
         Returns:
             Tuple (wavelengths, n, k) as JAX arrays.
         """
-        temps = np.array(self.temperatures)   # use numpy for simplicity
+        temps = np.array(self.temperatures)   # property
         if exact:
             mask = np.isclose(temps, temperature, atol=tol)
             if not np.any(mask):
-                raise KeyError(f"Temperature {temperature}K not found in {self.temperatures}")
+                raise KeyError(
+                    f"Temperature {temperature}K not found in {self.temperatures}"
+                )
             idx = np.argmax(mask).item()
         else:
             idx = np.argmin(np.abs(temps - temperature)).item()
