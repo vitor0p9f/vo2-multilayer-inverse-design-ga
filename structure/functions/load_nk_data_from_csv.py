@@ -7,20 +7,25 @@ def load_nk_data_from_csv(path: Path) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.nda
     """
     Load wavelength, n, k from a CSV file.
 
-    Supports two file formats:
-    1. Two‑section format (RefractiveIndex.info):
+    Supports three file formats:
+    1. Two‑section format (RefractiveIndex.info style):
           wl,n
           <data rows>
           <empty line>
           wl,k
           <data rows>
-       Each section must have the same wavelength grid (order can be swapped).
-    2. Classic three‑column format:
-          wavelength_um,n,k   (optional header)
+       If only the 'wl,n' section is present, k is set to zero for the same grid.
+       If only the 'wl,k' section is present, n is set to one (vacuum) for the same grid.
+    2. Two‑column classic format:
+          wavelength_um,n   (optional header)
+          <data rows>
+       k is automatically set to zero.
+    3. Three‑column classic format:
+          wavelength_um,n,k (optional header)
           <data rows>
 
     Returns:
-        wavelengths: 1D array (float32)
+        wavelengths: 1D array (float32) – always in µm as read from file
         n_values: 1D array (float32)
         k_values: 1D array (float32)
     """
@@ -32,7 +37,7 @@ def load_nk_data_from_csv(path: Path) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.nda
         raise ValueError(f"CSV file is empty: {path}")
 
     # ----- Detect the format -----
-    # Look for section headers "wl,n" and "wl,k" (case‑insensitive)
+    # Look for section headers "wl,n" and "wl,k" (case‑insensitive, ignoring spaces)
     has_section_header = any(
         line.lower().replace(' ', '').startswith(('wl,n', 'wl,k'))
         for line in lines
@@ -44,10 +49,9 @@ def load_nk_data_from_csv(path: Path) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.nda
         n_vals = []
         wl_k = []
         k_vals = []
-
         current_section = None
+
         for line in lines:
-            # Normalise: remove spaces, lowercase
             clean = line.lower().replace(' ', '')
             if clean == 'wl,n':
                 current_section = 'n'
@@ -56,7 +60,6 @@ def load_nk_data_from_csv(path: Path) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.nda
                 current_section = 'k'
                 continue
 
-            # Data line – split by comma
             parts = line.split(',')
             if len(parts) != 2:
                 raise ValueError(f"Expected 2 columns, got {len(parts)} in line: {line}")
@@ -74,30 +77,37 @@ def load_nk_data_from_csv(path: Path) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.nda
                 wl_k.append(wl_val)
                 k_vals.append(val)
             else:
-                # Data before any section header – skip or error?
-                # We'll treat as error because it's ambiguous.
                 raise ValueError(f"Data found before section header: {line}")
 
-        if not wl_n or not wl_k:
+        # Build result based on which sections are present
+        if wl_n and wl_k:
+            # Both sections present – ensure grids match exactly (or could sort, but we require order match)
+            if wl_n != wl_k:
+                raise ValueError(
+                    "Wavelength grids in 'wl,n' and 'wl,k' sections do not match. "
+                    "They must have identical wavelength values in the same order."
+                )
+            wavelengths = jnp.array(wl_n, dtype=jnp.float32)
+            n_values = jnp.array(n_vals, dtype=jnp.float32)
+            k_values = jnp.array(k_vals, dtype=jnp.float32)
+        elif wl_n:
+            # Only n section present – set k to zero
+            wavelengths = jnp.array(wl_n, dtype=jnp.float32)
+            n_values = jnp.array(n_vals, dtype=jnp.float32)
+            k_values = jnp.zeros_like(wavelengths)
+        elif wl_k:
+            # Only k section present – set n to one (vacuum)
+            wavelengths = jnp.array(wl_k, dtype=jnp.float32)
+            n_values = jnp.ones_like(wavelengths)
+            k_values = jnp.array(k_vals, dtype=jnp.float32)
+        else:
             raise ValueError(
-                "File is missing one or both sections (wl,n / wl,k)."
+                "No data found in either 'wl,n' or 'wl,k' section."
             )
-
-        # Ensure wavelength grids match
-        if wl_n != wl_k:
-            # If grids are identical except order, we could sort them,
-            # but for simplicity we require exact match.
-            raise ValueError(
-                "Wavelength grids in 'wl,n' and 'wl,k' sections do not match."
-            )
-
-        wavelengths = jnp.array(wl_n, dtype=jnp.float32)
-        n_values = jnp.array(n_vals, dtype=jnp.float32)
-        k_values = jnp.array(k_vals, dtype=jnp.float32)
 
     else:
-        # ----- Classic three‑column format (original logic) -----
-        # Try to detect if the first line is a header
+        # ----- Classic format (two or three columns) -----
+        # Detect if first line is a header
         try:
             float(lines[0].split(',')[0])
             skip_header = 0
@@ -106,13 +116,17 @@ def load_nk_data_from_csv(path: Path) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.nda
 
         data = np.loadtxt(path, delimiter=',', skiprows=skip_header, ndmin=2)
 
-        if data.shape[1] != 3:
+        if data.shape[1] == 2:
+            wavelengths = jnp.array(data[:, 0], dtype=jnp.float32)
+            n_values   = jnp.array(data[:, 1], dtype=jnp.float32)
+            k_values   = jnp.zeros_like(wavelengths)
+        elif data.shape[1] == 3:
+            wavelengths = jnp.array(data[:, 0], dtype=jnp.float32)
+            n_values   = jnp.array(data[:, 1], dtype=jnp.float32)
+            k_values   = jnp.array(data[:, 2], dtype=jnp.float32)
+        else:
             raise ValueError(
-                f"Expected 3 columns (wavelength, n, k), got {data.shape[1]} columns."
+                f"Expected 2 or 3 columns (wavelength, n, [k]), got {data.shape[1]} columns."
             )
-
-        wavelengths = jnp.array(data[:, 0], dtype=jnp.float32)
-        n_values   = jnp.array(data[:, 1], dtype=jnp.float32)
-        k_values   = jnp.array(data[:, 2], dtype=jnp.float32)
 
     return wavelengths, n_values, k_values
