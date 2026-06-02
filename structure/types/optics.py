@@ -14,12 +14,12 @@ class OpticalProperty:
     s_polarized: Float32[Array, "num_angles num_wavelengths"]
     
     @property
-    def unpolarized(self) -> Float32[Array, "num_angles num_wavelengths"]:
+    def non_polarized(self) -> Float32[Array, "num_angles num_wavelengths"]:
         return (self.p_polarized + self.s_polarized) / 2
 
 @register_dataclass
 @dataclass(frozen=True)
-class Absorbance(OpticalProperty):
+class Absorptance(OpticalProperty):
     pass
 
 @register_dataclass
