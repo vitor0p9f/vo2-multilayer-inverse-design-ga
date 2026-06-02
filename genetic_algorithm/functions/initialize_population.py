@@ -30,7 +30,7 @@ def initialize_population(
         Population object containing `population_size` individuals.
     """
     # Advance the key: one for this function, one for future use
-    key, subkey = jax.random.split(key)
+    next_key, subkey = jax.random.split(key)
 
     # Split the subkey into independent seeds for each individual
     keys = jax.random.split(subkey, population_size)
@@ -54,4 +54,4 @@ def initialize_population(
         free_material_mask=batched_struct.free_material_mask,
     )
 
-    return key, population
+    return next_key, population

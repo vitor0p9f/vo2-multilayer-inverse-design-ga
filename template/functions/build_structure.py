@@ -24,7 +24,7 @@ def build_random_structure_from_template(
         thickness_options_um: 1D array of allowed thicknesses in micrometers.
 
     Returns:
-        (new_key, structure)
+        (next_key, structure)
     """
     # ----- 1. Build symbol -> index mapping -----
     symbol_to_idx = {mat.symbol: i for i, mat in enumerate(materials)}
@@ -121,7 +121,7 @@ def build_random_structure_from_template(
     free_layer_count = sum(1 for m in mapping if m == Mapping.FREE_LAYER)
 
     # ----- 4. Randomly decide active free layers -----
-    key_sub, key_mat, key_thick, key_act = jax.random.split(key, 4)
+    next_key, key_mat, key_thick, key_act = jax.random.split(key, 4)
 
     num_active_free = jax.random.randint(key_act, (), 0, free_layer_count + 1)
 
@@ -172,4 +172,5 @@ def build_random_structure_from_template(
         free_thickness_mask=free_thick_mask,
         free_material_mask=free_mat_mask,
     )
-    return key_sub, structure
+
+    return next_key, structure
