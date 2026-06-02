@@ -2,7 +2,7 @@ from typing import List, Tuple
 from template.objects.template import Template
 from structure.objects.material import Material
 from structure.objects.structure import Structure
-from structure.types.structure import Thicknesses, Mask, Materials
+from structure.types.structure import Thicknesses
 from template.functions.build_structure import build_random_structure_from_template
 from genetic_algorithm.objects.population import Population
 
@@ -14,6 +14,7 @@ def initialize_population(
     materials: List[Material],
     thickness_options_m: Thicknesses,
     population_size: int,
+    allow_air_gap: bool = False,
 ) -> Tuple[jax.random.PRNGKey, Population]:
     """
     Creates a population of random structures from a template.
@@ -21,9 +22,14 @@ def initialize_population(
     Args:
         template: Blueprint for layer structure.
         key: JAX PRNG key (will be advanced).
-        materials: Available materials (order defines index).
+        materials: Available materials (order defines index). The material
+            with symbol "Air" (if present) can be excluded from free layers
+            via `allow_air_gap`.
         thickness_options_m: Allowed discrete thicknesses in meters.
         population_size: Number of structures to generate.
+        allow_air_gap: If False (default), the material "Air" is excluded
+            from random selection for free internal layers. The incidence
+            medium and substrate are never affected.
 
     Returns:
         (next_key, population): The advanced PRNG key and the generated
@@ -35,10 +41,14 @@ def initialize_population(
     # Split the subkey into independent seeds for each individual
     keys = jax.random.split(subkey, population_size)
 
-    # Function that builds one Structure from one key (discards its output key)
+    # Function that builds one Structure from one key
     def build_one(single_key: jax.random.PRNGKey) -> Structure:
         _, struct = build_random_structure_from_template(
-            template, single_key, materials, thickness_options_m
+            template=template,
+            key=single_key,
+            materials=materials,
+            thickness_options_m=thickness_options_m,
+            allow_air_gap=allow_air_gap,
         )
         return struct
 

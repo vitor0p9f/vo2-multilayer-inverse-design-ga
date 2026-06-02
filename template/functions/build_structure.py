@@ -13,6 +13,7 @@ def build_random_structure_from_template(
     key: jax.random.PRNGKey,
     materials: List[Material],
     thickness_options_m: Thicknesses,
+    allow_air_gap: bool = False,
 ) -> Tuple[jax.random.PRNGKey, Structure]:
     """
     Creates a random concrete Structure from a template.
@@ -20,11 +21,18 @@ def build_random_structure_from_template(
     Args:
         template: A validated Template (contains layer_mapping and max_layers).
         key: JAX PRNG key.
-        materials: List of Material objects (used for index mapping).
-        thickness_options_um: 1D array of allowed thicknesses in micrometers.
+        materials: List of Material objects (used for index mapping). The
+            material with symbol "Air" (if present) can be excluded from
+            free layers via `allow_air_gap`.
+        thickness_options_m: 1D array of allowed thicknesses in meters.
+        allow_air_gap: If False (default), the material "Air" is excluded
+            from random selection for free internal layers. The incidence
+            medium and substrate are never affected by this flag — they
+            use exactly the material specified in the template.
 
     Returns:
-        (next_key, structure)
+        (next_key, structure): The advanced PRNG key and a randomly
+        generated Structure consistent with the template.
     """
     # ----- 1. Build symbol -> index mapping -----
     symbol_to_idx = {mat.symbol: i for i, mat in enumerate(materials)}
@@ -48,7 +56,7 @@ def build_random_structure_from_template(
                 fixed_layers += item.number
             else:
                 wildcards.append(item)
-        elif isinstance(item, Layer):   # includes Substrate? No, substrate already separated
+        elif isinstance(item, Layer):
             fixed_layers += 1
         else:
             raise TypeError(f"Unexpected middle element type: {type(item)}")
@@ -64,13 +72,10 @@ def build_random_structure_from_template(
     if num_wildcards == 0:
         for item in middle_raw:
             if isinstance(item, FreeBlock) and item.number > 0:
-                # create number of free layers
                 for _ in range(item.number):
                     expanded_middle.append(Layer(material_symbol=None, thickness_m=None))
             elif isinstance(item, Layer):
-                # keep as is (may have None material or thickness)
                 expanded_middle.append(item)
-            # (FreeBlock with number==0 cannot happen here because wildcards list empty)
     else:
         if remaining < num_wildcards:
             raise ValueError(f"Remaining layers ({remaining}) insufficient for {num_wildcards} wildcards")
@@ -81,11 +86,9 @@ def build_random_structure_from_template(
         for item in middle_raw:
             if isinstance(item, FreeBlock):
                 if item.number > 0:
-                    # fixed FreeBlock
                     for _ in range(item.number):
                         expanded_middle.append(Layer(material_symbol=None, thickness_m=None))
                 else:
-                    # wildcard: expand to allocation number of free layers
                     alloc = allocations[wildcard_idx]
                     for _ in range(alloc):
                         expanded_middle.append(Layer(material_symbol=None, thickness_m=None))
@@ -97,8 +100,7 @@ def build_random_structure_from_template(
     expanded_layers = [incidence] + expanded_middle + [substrate]
     n_layers = len(expanded_layers)
 
-    # The expanded mapping corresponds exactly to template.expanded_mapping
-    mapping = template.expanded_mapping   # tuple of Mapping enums
+    mapping = template.expanded_mapping
     if len(mapping) != n_layers:
         raise RuntimeError("Expanded layer count does not match expanded mapping length")
 
@@ -132,8 +134,17 @@ def build_random_structure_from_template(
             active_mask = active_mask.at[i].set(free_idx < num_active_free)
             free_idx += 1
 
-    # ----- 5. Generate random materials and thicknesses -----
-    rand_mats = jax.random.randint(key_mat, (n_layers,), 0, num_materials, dtype=jnp.int8)
+    # ----- 5. Generate random materials (respecting allow_air_gap) -----
+    if not allow_air_gap and "Air" in symbol_to_idx:
+        air_idx = symbol_to_idx["Air"]
+        allowed_list = [i for i in range(num_materials) if i != air_idx]
+        allowed_indices = jnp.array(allowed_list, dtype=jnp.int8)
+        # Random indices into allowed_indices
+        rand_sub_idx = jax.random.randint(key_mat, (n_layers,), 0, len(allowed_list), dtype=jnp.int32)
+        rand_mats = allowed_indices[rand_sub_idx]
+    else:
+        rand_mats = jax.random.randint(key_mat, (n_layers,), 0, num_materials, dtype=jnp.int8)
+
     thick_indices = jax.random.randint(key_thick, (n_layers,), 0, len(thickness_options_m))
     rand_thicks = thickness_options_m[thick_indices]
 
@@ -157,7 +168,7 @@ def build_random_structure_from_template(
     final_materials = jnp.where(free_mat_mask, rand_mats, final_materials)
     final_thicknesses = jnp.where(free_thick_mask, rand_thicks, final_thicknesses)
 
-    # Force incidence and substrate to be active (already active)
+    # Force incidence and substrate to be active
     inc_types = (Mapping.INCIDENCE_MEDIUM, Mapping.PARTIAL_INCIDENCE_MEDIUM_MISSING_MATERIAL)
     sub_types = (Mapping.SUBSTRATE, Mapping.PARTIAL_SUBSTRATE_MISSING_MATERIAL)
     for i, m in enumerate(mapping):
