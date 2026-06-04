@@ -290,3 +290,43 @@ class Material:
     def _get_at_temperature_index(self, idx: int) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         """Return (wavelengths, n, k) for the temperature at index `idx`."""
         return self._wavelengths[idx], self._n_values[idx], self._k_values[idx]
+    
+    def to_dict(self) -> dict:
+        """
+        Convert the Material to a JSON‑serializable dictionary.
+        """
+        return {
+            "name": self.name,
+            "symbol": self.symbol,
+            "cte": self.cte,
+            "files": [str(f) for f in self.files],
+            "_temperatures": list(self._temperatures),
+            "_wavelengths": [wl.tolist() for wl in self._wavelengths],
+            "_n_values": [n.tolist() for n in self._n_values],
+            "_k_values": [k.tolist() for k in self._k_values],
+            "_is_common_grid": self._is_common_grid,
+            "database_dir": str(self.database_dir),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Material":
+        """
+        Reconstruct a Material from a dictionary produced by to_dict().
+        """
+        # Convert lists back to JAX arrays
+        wl_tuple = tuple(jnp.array(wl, dtype=jnp.float32) for wl in data["_wavelengths"])
+        n_tuple = tuple(jnp.array(n, dtype=jnp.float32) for n in data["_n_values"])
+        k_tuple = tuple(jnp.array(k, dtype=jnp.float32) for k in data["_k_values"])
+        temps_tuple = tuple(data["_temperatures"])
+
+        # Create an "empty" Material (without files) and manually set the optical data
+        material = cls(
+            name=data["name"],
+            symbol=data["symbol"],
+            cte=data["cte"],
+            files=(),
+            database_dir=Path(data.get("database_dir", "database")),
+        )
+        material._set_attrs(wl_tuple, n_tuple, k_tuple, temps_tuple)
+        # Override the common grid flag if needed (should be set by _set_attrs)
+        return material
