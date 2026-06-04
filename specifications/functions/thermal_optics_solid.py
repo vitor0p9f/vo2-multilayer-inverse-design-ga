@@ -40,60 +40,53 @@ def predict_temperature_based_k(
 
 @jit
 def kramers_kronig_delta_n(
-    wavelength_m: jnp.ndarray,
-    delta_k: jnp.ndarray,
+    wavelength_m: jnp.ndarray,   # (N,)
+    delta_k: jnp.ndarray,        # (N,)
 ) -> jnp.ndarray:
     """
-    Compute the change in refractive index (delta n) from delta_k
-    via the Kramers‑Kronig relation.
+    Fast Kramers‑Kronig delta‑n via vectorised principal‑value integration.
 
-    This implementation is fully JIT‑compatible: it avoids boolean masks
-    with non‑concrete shapes and uses lax.fori_loop for the principal‑value
-    integration.
+    Complexity: O(N²) memory, but fully parallel and JIT‑friendly.
+    For typical spectroscopic grids (N < ~2000) this compiles instantly
+    and runs in milliseconds.
     """
     omega = omega_from_lambda(wavelength_m)
 
-    # Sort by increasing frequency
+    # Sort by angular frequency (required for trapezoidal weights)
     idx = jnp.argsort(omega)
     omega_sorted = omega[idx]
-    delta_k_sorted = delta_k[idx]
+    dk_sorted = delta_k[idx]
+    N = omega_sorted.shape[0]
 
-    n_pts = omega_sorted.shape[0]
-    numerator = omega_sorted * delta_k_sorted  # ω Δk(ω)
+    # Numerator: ω * Δk(ω)
+    num = omega_sorted * dk_sorted
 
-    def compute_delta_n(i: int) -> jnp.ndarray:
-        """Compute delta_n at index i using the principal‑value integral."""
-        omega_i = omega_sorted[i]
+    # Trapezoidal integration weights for non‑uniform grid
+    dw = jnp.diff(omega_sorted)
+    weights = jnp.zeros_like(omega_sorted)
+    weights = weights.at[0].set(dw[0] / 2.0)
+    weights = weights.at[-1].set(dw[-1] / 2.0)
+    weights = weights.at[1:-1].set((dw[:-1] + dw[1:]) / 2.0)
 
-        # Integral for indices < i
-        def body_left(k, acc):
-            x0, x1 = omega_sorted[k], omega_sorted[k+1]
-            y0 = numerator[k] / (x0*x0 - omega_i*omega_i)
-            y1 = numerator[k+1] / (x1*x1 - omega_i*omega_i)
-            area = 0.5 * (y0 + y1) * (x1 - x0)
-            return acc + area
+    # Matrix of denominators: ω_j² – ω_i², shape (N, N)
+    omega_sq = omega_sorted ** 2
+    denom = omega_sq[:, None] - omega_sq[None, :]
 
-        integral_left = lax.fori_loop(0, i, body_left, 0.0) if i > 0 else 0.0
+    # Set diagonal to a non‑zero value to avoid NaN; we will zero the diagonal after division
+    denom = denom.at[jnp.diag_indices(N)].set(1.0)
 
-        # Integral for indices > i
-        def body_right(k, acc):
-            x0, x1 = omega_sorted[k], omega_sorted[k+1]
-            y0 = numerator[k] / (x0*x0 - omega_i*omega_i)
-            y1 = numerator[k+1] / (x1*x1 - omega_i*omega_i)
-            area = 0.5 * (y0 + y1) * (x1 - x0)
-            return acc + area
+    # Element‑wise integrand: M[i,j] = (num[j] * w[j]) / (ω_j² – ω_i²)
+    M = num[None, :] * weights[None, :] / denom
 
-        integral_right = lax.fori_loop(i+1, n_pts-1, body_right, 0.0) if i < n_pts-1 else 0.0
+    # The diagonal corresponds to the singular point ω_i = ω_j, excluded from the integral
+    M = M.at[jnp.diag_indices(N)].set(0.0)
 
-        return (2.0 / jnp.pi) * (integral_left + integral_right)
+    # Integral ≈ sum over j for each i
+    delta_n_sorted = (2.0 / jnp.pi) * jnp.sum(M, axis=1)
 
-    # Compute delta_n for all spectral points
-    delta_n_sorted = jnp.array([compute_delta_n(i) for i in range(n_pts)])
-
-    # Restore original order
-    inverse_idx = jnp.argsort(idx)
-    return delta_n_sorted[inverse_idx]
-
+    # Restore original wavelength order
+    inv_idx = jnp.argsort(idx)
+    return delta_n_sorted[inv_idx]
 
 def predict_nk_from_reference(
     reference_wavelengths_m: jnp.ndarray,
