@@ -1,5 +1,5 @@
-from structure.objects.structure import Structure
-from structure.objects.material import Material
+from specifications.objects.structure import Structure
+from specifications.objects.material import Material
 
 import jax
 import jax.numpy as jnp

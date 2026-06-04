@@ -1,8 +1,8 @@
 from typing import List, Tuple
 from template.objects.template import Template
-from structure.objects.material import Material
-from structure.objects.structure import Structure
-from structure.types.structure import Thicknesses
+from specifications.objects.material import Material
+from specifications.objects.structure import Structure
+from specifications.types.structure import Thicknesses
 from template.functions.build_structure import build_random_structure_from_template
 from genetic_algorithm.objects.population import Population
 

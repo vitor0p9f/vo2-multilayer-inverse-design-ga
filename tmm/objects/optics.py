@@ -1,6 +1,6 @@
-from structure.types.optics import Reflectance as OpticalReflectance
-from structure.types.optics import Absorptance as OpticalAbsorptance
-from structure.types.optics import Transmittance as OpticalTransmittance
+from specifications.types.optics import Reflectance as OpticalReflectance
+from specifications.types.optics import Absorptance as OpticalAbsorptance
+from specifications.types.optics import Transmittance as OpticalTransmittance
 from dataclasses import dataclass
 from jax.tree_util import register_dataclass
 

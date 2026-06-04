@@ -1,11 +1,8 @@
 from typing import Union, Type
+from specifications.types.optics import Reflectance, Transmittance, Absorptance
+from specifications.types.environment import Wavelengths
+
 import jax.numpy as jnp
-
-from structure.types.optics import (
-    Wavelengths,
-    Reflectance, Transmittance, Absorptance
-)
-
 
 def super_gaussian_target(
     wavelengths: Wavelengths,          # (W,)  wavelengths [m]

@@ -7,7 +7,7 @@ corrections.  The extinction coefficient k is assumed to be zero.
 
 import jax.numpy as jnp
 from jax import jit
-from structure.objects.material import Material
+from specifications.objects.material import Material
 
 
 @jit

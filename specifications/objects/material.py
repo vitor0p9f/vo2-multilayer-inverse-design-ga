@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from jax.tree_util import register_dataclass
 from ..functions.load_nk_data_from_csv import load_nk_data_from_csv
-from ..types.optics import Wavelengths, N_values, K_values
+from ..types.optics import N_values, K_values
+from ..types.environment import Wavelengths
 
 import re
 import jax.numpy as jnp

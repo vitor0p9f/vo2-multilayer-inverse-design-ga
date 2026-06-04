@@ -9,7 +9,7 @@ obtain the corresponding change in refractive index n.
 import jax.numpy as jnp
 from jax import jit
 import jax.lax as lax
-from structure.objects.material import Material
+from specifications.objects.material import Material
 
 
 @jit

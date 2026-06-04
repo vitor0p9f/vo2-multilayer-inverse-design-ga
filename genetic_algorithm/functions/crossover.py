@@ -2,7 +2,7 @@ from typing import Tuple, List
 import jax
 import jax.numpy as jnp
 from jax import lax
-from structure.objects.structure import Structure
+from specifications.objects.structure import Structure
 
 def crossover_structures(
     parent_pairs: List[Tuple[Structure, Structure]],

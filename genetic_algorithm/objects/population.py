@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from jax.tree_util import register_dataclass
 
-from structure.types.structure import Mask, Materials, Thicknesses
+from specifications.types.structure import Mask, Materials, Thicknesses
 
 @register_dataclass
 @dataclass(frozen=True)

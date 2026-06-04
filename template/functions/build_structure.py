@@ -1,8 +1,8 @@
 from typing import List, Tuple
 from ..objects.template import Template
-from structure.objects.material import Material
-from structure.objects.structure import Structure
-from structure.types.structure import Thicknesses
+from specifications.objects.material import Material
+from specifications.objects.structure import Structure
+from specifications.types.structure import Thicknesses
 from ..objects.layers import Mapping, FreeBlock, Layer
 
 import jax
