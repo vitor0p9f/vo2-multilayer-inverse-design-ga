@@ -99,14 +99,27 @@ def plot_best_structure(
 
 def _draw_structure(ax, structure: Structure, material_database: List[Material]) -> None:
     """
-    Draw a vertical stack of layers with material‑consistent colours and
-    labels centred inside each rectangle.
+    Draw a vertical stack of only the visible layers (fixed or active free).
+    Layers that are free and inactive are omitted.
     """
-    L = structure.materials.shape[0]
-    indices = structure.materials
-    thicknesses = structure.thicknesses_m
+    # Determine which layers to show: fixed layers always visible,
+    # free layers only if active_mask is True.
+    free_mask = structure.free_thickness_mask | structure.free_material_mask
+    show_mask = ~free_mask | structure.active_mask  # True = keep
 
-    # Symbol for each layer
+    # Filter all layer attributes
+    indices = structure.materials[show_mask]
+    thicknesses = structure.thicknesses_m[show_mask]
+    active_flags = structure.active_mask[show_mask]
+
+    L_visible = len(indices)
+    if L_visible == 0:
+        ax.text(0.5, 0.5, 'No visible layers', ha='center', va='center',
+                transform=ax.transAxes, fontsize=10)
+        ax.axis('off')
+        return
+
+    # Symbol for each displayed layer
     symbols = [material_database[int(idx)].symbol for idx in indices]
 
     # Fixed colour per distinct material
@@ -116,7 +129,7 @@ def _draw_structure(ax, structure: Structure, material_database: List[Material])
 
     # Labels: material symbol + thickness (or "semi‑infinite")
     labels = []
-    for i in range(L):
+    for i in range(L_visible):
         d = float(thicknesses[i])
         if jnp.isinf(d):
             lbl = f"{symbols[i]}\nsemi‑infinite"
@@ -125,9 +138,9 @@ def _draw_structure(ax, structure: Structure, material_database: List[Material])
         labels.append(lbl)
 
     # Visual parameters
-    bar_width = 0.6                # narrower for cleaner centering
+    bar_width = 0.6
     layer_height = 1.5
-    y_top = L * layer_height
+    y_top = L_visible * layer_height
 
     for lbl, idx in zip(labels, indices):
         y_bottom = y_top - layer_height
@@ -139,8 +152,7 @@ def _draw_structure(ax, structure: Structure, material_database: List[Material])
                 color='white')
         y_top = y_bottom
 
-    # Symmetric x‑limits to perfectly centre the stack
     ax.set_xlim(-1.0, 1.0)
-    ax.set_ylim(0, L * layer_height)
+    ax.set_ylim(0, L_visible * layer_height)
     ax.axis('off')
     ax.set_title("Structure layers", fontsize=12, fontweight='normal')

@@ -27,6 +27,11 @@ def evaluate_population(
     absorptance) is computed over all temperatures and angles, and a scalar
     cost is calculated using a weighted band‑limited MSE against the target.
 
+    The active_mask of each structure is respected **only for free layers**:
+    free layers with active_mask=False are given zero thickness, effectively
+    removing them from the optical stack. Fixed layers (incidence, substrate,
+    and any layers not marked as free) always retain their thickness.
+
     Args:
         env:              Environment (temperatures, angles, wavelengths).
         pop:              Population of structures (batched arrays).
@@ -37,7 +42,6 @@ def evaluate_population(
     Returns:
         List of EvaluationResult, one per structure in the population.
     """
-
     # ==================================================================
     # 1.  Pre‑compute n,k for all materials on the common wavelength grid
     #     at every temperature → (T, num_materials, W)
@@ -58,6 +62,11 @@ def evaluate_population(
             k_all = k_all.at[t_idx, m_idx].set(
                 jnp.interp(env.wavelengths, wl_mat, k_vals)
             )
+
+    # Free masks are identical for all individuals – take from the first one.
+    free_mat_mask = pop.free_material_mask[0]
+    free_thick_mask = pop.free_thickness_mask[0]
+    free_mask = free_mat_mask | free_thick_mask   # layers that may be turned off
 
     # ==================================================================
     # 2.  Nested loss function (mask‑based, no boolean indexing issues)
@@ -92,7 +101,6 @@ def evaluate_population(
     # ==================================================================
     # 3.  Determine which property to match (robust against class re‑definition)
     # ==================================================================
-    # Use class name as fallback in case isinstance fails (e.g., after module reload)
     if isinstance(target, Reflectance) or type(target).__name__ == "Reflectance":
         prop_attr = 'reflectance'
     elif isinstance(target, Transmittance) or type(target).__name__ == "Transmittance":
@@ -106,12 +114,17 @@ def evaluate_population(
     def _eval_one_structure(
         mat_indices: Int8[Array, "L"],
         thicknesses: Thicknesses,
+        active_mask: Mask,
     ) -> Tuple[
         Float32[Array, ""],
         Float32[Array, "T A W"],
         Float32[Array, "T A W"],
         Float32[Array, "T A W"],
     ]:
+        # Zero thickness only for free layers that are inactive.
+        # Fixed layers always keep their thickness, regardless of active_mask.
+        thicknesses = jnp.where(active_mask | ~free_mask, thicknesses, 0.0)
+
         # Select n,k for this structure's materials.
         # n_all, k_all are (T, num_materials, W), mat_indices (L,)
         # We need (T, W, L) for tmm_batch.
@@ -139,9 +152,11 @@ def evaluate_population(
         cost = _compute_loss(P, target.non_polarized)
         return cost, R_all, T_all, A_all
 
-    # Vectorise over population
-    batch_fn = jax.vmap(_eval_one_structure, in_axes=(0, 0))
-    costs, R_batch, T_batch, A_batch = batch_fn(pop.materials, pop.thicknesses_m)
+    # Vectorise over population – now maps over three arrays
+    batch_fn = jax.vmap(_eval_one_structure, in_axes=(0, 0, 0))
+    costs, R_batch, T_batch, A_batch = batch_fn(
+        pop.materials, pop.thicknesses_m, pop.active_mask
+    )
 
     # ==================================================================
     # 5.  Build EvaluationResult objects
