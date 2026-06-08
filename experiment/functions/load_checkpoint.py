@@ -38,8 +38,8 @@ def load_checkpoint(
         materials=jnp.array(bs["materials"], dtype=jnp.int8),
         thicknesses_m=jnp.array(bs["thicknesses_m"], dtype=jnp.float32),
         active_mask=active_mask_arr,
-        free_thickness_mask=jnp.zeros_like(active_mask_arr, dtype=bool),
-        free_material_mask=jnp.zeros_like(active_mask_arr, dtype=bool),
+        free_thickness_mask=jnp.array(bs["free_thickness_mask"], dtype=bool),
+        free_material_mask=jnp.array(bs["free_material_mask"], dtype=bool),
     )
 
     # Load population
@@ -52,15 +52,6 @@ def load_checkpoint(
             free_material_mask=data["free_material_mask"],
         )
 
-    # Fix free masks on best structure
-    best_structure = Structure(
-        materials=best_structure.materials,
-        thicknesses_m=best_structure.thicknesses_m,
-        active_mask=best_structure.active_mask,
-        free_thickness_mask=population.free_thickness_mask[0],
-        free_material_mask=population.free_material_mask[0],
-    )
-
     # Rebuild best‑5 archive
     best5 = []
     for item in state.get("best5", []):
@@ -68,8 +59,8 @@ def load_checkpoint(
             materials=jnp.array(item["materials"], dtype=jnp.int8),
             thicknesses_m=jnp.array(item["thicknesses_m"], dtype=jnp.float32),
             active_mask=jnp.array(item["active_mask"], dtype=bool),
-            free_thickness_mask=population.free_thickness_mask[0],
-            free_material_mask=population.free_material_mask[0],
+            free_thickness_mask=jnp.array(item.get("free_thickness_mask", []), dtype=bool),
+            free_material_mask=jnp.array(item.get("free_material_mask", []), dtype=bool),
         )
         best5.append((s, item["cost"]))
 

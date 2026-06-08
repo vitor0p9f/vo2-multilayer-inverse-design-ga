@@ -31,6 +31,8 @@ def save_checkpoint(
             "materials": best_structure.materials.tolist(),
             "thicknesses_m": best_structure.thicknesses_m.tolist(),
             "active_mask": best_structure.active_mask.tolist(),
+            "free_thickness_mask": best_structure.free_thickness_mask.tolist(),
+            "free_material_mask": best_structure.free_material_mask.tolist(),
         },
         "key": key.tolist(),
         "best5": [
@@ -38,6 +40,8 @@ def save_checkpoint(
                 "materials": s.materials.tolist(),
                 "thicknesses_m": s.thicknesses_m.tolist(),
                 "active_mask": s.active_mask.tolist(),
+                "free_thickness_mask": s.free_thickness_mask.tolist(),
+                "free_material_mask": s.free_material_mask.tolist(),
                 "cost": float(c),
             }
             for s, c in best5
