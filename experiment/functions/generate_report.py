@@ -81,7 +81,7 @@ def _plot_best_structures(
         active_mask_arr = jnp.array(entry["active_mask"], dtype=bool)
         s = Structure(
             materials=jnp.array(entry["materials"], dtype=jnp.int8),
-            thicknesses_m=jnp.array(entry["thicknesses_m"], dtype=jnp.float32),
+            thicknesses_m=jnp.array(entry["thicknesses_m"], dtype=jnp.float64),
             active_mask=active_mask_arr,
             free_thickness_mask=jnp.zeros_like(active_mask_arr, dtype=bool),  # now works
             free_material_mask=jnp.zeros_like(active_mask_arr, dtype=bool),

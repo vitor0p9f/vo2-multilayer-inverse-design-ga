@@ -6,11 +6,11 @@ from specifications.objects.structure import Structure
 
 def crossover_structures(
     parent_pairs: List[Tuple[Structure, Structure]],
-    key: jax.random.PRNGKey,
+    key: jax.Array,
     n_cuts: int = 1,
     crossover_rate: float = 0.9,
     num_children_per_pair: int = 2,
-) -> Tuple[jax.random.PRNGKey, List[Structure]]:
+) -> Tuple[jax.Array, List[Structure]]:
     """
     Multi‑point crossover for a batch of parent pairs.
 

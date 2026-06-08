@@ -10,12 +10,12 @@ import jax
 
 def initialize_population(
     template: Template,
-    key: jax.random.PRNGKey,
+    key: jax.Array,
     materials: List[Material],
     thickness_options_m: Thicknesses,
     population_size: int,
     allow_air_gap: bool = False,
-) -> Tuple[jax.random.PRNGKey, Population]:
+) -> Tuple[jax.Array, Population]:
     """
     Creates a population of random structures from a template.
 
@@ -42,7 +42,7 @@ def initialize_population(
     keys = jax.random.split(subkey, population_size)
 
     # Function that builds one Structure from one key
-    def build_one(single_key: jax.random.PRNGKey) -> Structure:
+    def build_one(single_key: jax.Array) -> Structure:
         _, struct = build_random_structure_from_template(
             template=template,
             key=single_key,

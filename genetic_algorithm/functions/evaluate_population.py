@@ -50,8 +50,8 @@ def evaluate_population(
     W = env.wavelengths.shape[0]
     T = env.temperatures.shape[0]
 
-    n_all = jnp.zeros((T, num_materials, W), dtype=jnp.float32)
-    k_all = jnp.zeros((T, num_materials, W), dtype=jnp.float32)
+    n_all = jnp.zeros((T, num_materials, W), dtype=jnp.float64)
+    k_all = jnp.zeros((T, num_materials, W), dtype=jnp.float64)
 
     for t_idx, temp in enumerate(env.temperatures):
         for m_idx, mat in enumerate(material_database):
@@ -83,10 +83,10 @@ def evaluate_population(
         target_expanded = target_nonpol[jnp.newaxis, jnp.newaxis, :]  # (1, 1, W)
 
         def _per_temp(spectrum_T):   # spectrum_T: (A, W)
-            loss = jnp.float32(0.0)
+            loss = jnp.float64(0.0)
             for band in bands:
                 # Float mask: 1.0 inside band, 0.0 outside
-                mask = band.contains(env.wavelengths).astype(jnp.float32)  # (W,)
+                mask = band.contains(env.wavelengths).astype(jnp.float64)  # (W,)
                 # Squared error: (A, W) vs (1, 1, W) → broadcast
                 sq_err = (spectrum_T - target_expanded[0, :, :]) ** 2
                 # Band MSE = sum(sq_err * mask) / sum(mask)

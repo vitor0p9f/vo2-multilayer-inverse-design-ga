@@ -7,10 +7,10 @@ import jax.numpy as jnp
 
 def select_parent_pairs(
     results: List[EvaluationResult],
-    key: jax.random.PRNGKey,
+    key: jax.Array,
     elite_frac: float = 0.1,
     tournament_size: int = 3,
-) -> Tuple[jax.random.PRNGKey, List[Tuple[Structure, Structure]]]:
+) -> Tuple[jax.Array, List[Tuple[Structure, Structure]]]:
     """
     Tournament selection of parent pairs with replacement.
 
@@ -49,7 +49,7 @@ def select_parent_pairs(
     num_parents = 2 * num_pairs
 
     # Fitness vector (lower is better)
-    costs = jnp.array([r.cost for r in results], dtype=jnp.float32)
+    costs = jnp.array([r.cost for r in results], dtype=jnp.float64)
 
     # Split the PRNG key: one part for the random indices, one for future use
     next_key, subkey = jax.random.split(key)

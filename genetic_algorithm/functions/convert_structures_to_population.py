@@ -19,7 +19,7 @@ def structures_to_population(structs: List[Structure]) -> Population:
     if not structs:
         return Population(
             materials=jnp.empty((0, 0), dtype=jnp.int8),
-            thicknesses_m=jnp.empty((0, 0), dtype=jnp.float32),
+            thicknesses_m=jnp.empty((0, 0), dtype=jnp.float64),
             active_mask=jnp.empty((0, 0), dtype=bool),
             free_thickness_mask=jnp.empty((0, 0), dtype=bool),
             free_material_mask=jnp.empty((0, 0), dtype=bool),

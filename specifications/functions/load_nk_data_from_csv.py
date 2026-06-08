@@ -87,19 +87,19 @@ def load_nk_data_from_csv(path: Path) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.nda
                     "Wavelength grids in 'wl,n' and 'wl,k' sections do not match. "
                     "They must have identical wavelength values in the same order."
                 )
-            wavelengths = jnp.array(wl_n, dtype=jnp.float32)
-            n_values = jnp.array(n_vals, dtype=jnp.float32)
-            k_values = jnp.array(k_vals, dtype=jnp.float32)
+            wavelengths = jnp.array(wl_n, dtype=jnp.float64)
+            n_values = jnp.array(n_vals, dtype=jnp.float64)
+            k_values = jnp.array(k_vals, dtype=jnp.float64)
         elif wl_n:
             # Only n section present – set k to zero
-            wavelengths = jnp.array(wl_n, dtype=jnp.float32)
-            n_values = jnp.array(n_vals, dtype=jnp.float32)
+            wavelengths = jnp.array(wl_n, dtype=jnp.float64)
+            n_values = jnp.array(n_vals, dtype=jnp.float64)
             k_values = jnp.zeros_like(wavelengths)
         elif wl_k:
             # Only k section present – set n to one (vacuum)
-            wavelengths = jnp.array(wl_k, dtype=jnp.float32)
+            wavelengths = jnp.array(wl_k, dtype=jnp.float64)
             n_values = jnp.ones_like(wavelengths)
-            k_values = jnp.array(k_vals, dtype=jnp.float32)
+            k_values = jnp.array(k_vals, dtype=jnp.float64)
         else:
             raise ValueError(
                 "No data found in either 'wl,n' or 'wl,k' section."
@@ -117,13 +117,13 @@ def load_nk_data_from_csv(path: Path) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.nda
         data = np.loadtxt(path, delimiter=',', skiprows=skip_header, ndmin=2)
 
         if data.shape[1] == 2:
-            wavelengths = jnp.array(data[:, 0], dtype=jnp.float32)
-            n_values   = jnp.array(data[:, 1], dtype=jnp.float32)
+            wavelengths = jnp.array(data[:, 0], dtype=jnp.float64)
+            n_values   = jnp.array(data[:, 1], dtype=jnp.float64)
             k_values   = jnp.zeros_like(wavelengths)
         elif data.shape[1] == 3:
-            wavelengths = jnp.array(data[:, 0], dtype=jnp.float32)
-            n_values   = jnp.array(data[:, 1], dtype=jnp.float32)
-            k_values   = jnp.array(data[:, 2], dtype=jnp.float32)
+            wavelengths = jnp.array(data[:, 0], dtype=jnp.float64)
+            n_values   = jnp.array(data[:, 1], dtype=jnp.float64)
+            k_values   = jnp.array(data[:, 2], dtype=jnp.float64)
         else:
             raise ValueError(
                 f"Expected 2 or 3 columns (wavelength, n, [k]), got {data.shape[1]} columns."

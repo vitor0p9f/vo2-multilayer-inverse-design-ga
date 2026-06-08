@@ -10,11 +10,11 @@ import jax.numpy as jnp
 
 def build_random_structure_from_template(
     template: Template,
-    key: jax.random.PRNGKey,
+    key: jax.Array,
     materials: List[Material],
     thickness_options_m: Thicknesses,
     allow_air_gap: bool = False,
-) -> Tuple[jax.random.PRNGKey, Structure]:
+) -> Tuple[jax.Array, Structure]:
     """
     Creates a random concrete Structure from a template.
 
@@ -150,7 +150,7 @@ def build_random_structure_from_template(
 
     # ----- 6. Fill fixed values from expanded layers, then overwrite free positions -----
     final_materials = jnp.zeros(n_layers, dtype=jnp.int8)
-    final_thicknesses = jnp.zeros(n_layers, dtype=jnp.float32)
+    final_thicknesses = jnp.zeros(n_layers, dtype=jnp.float64)
 
     for i, layer in enumerate(expanded_layers):
         if not free_mat_mask[i]:

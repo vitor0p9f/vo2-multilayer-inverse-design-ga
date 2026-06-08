@@ -64,10 +64,10 @@ class Material:
             wl_list, n_list, k_list = [], [], []
             for f in self.files:
                 wl_um, n, k = load_nk_data_from_csv(f)          # expects µm
-                wl_m = jnp.asarray(wl_um, dtype=jnp.float32) * 1e-6   # convert to meters
+                wl_m = jnp.asarray(wl_um, dtype=jnp.float64) * 1e-6   # convert to meters
                 wl_list.append(wl_m)
-                n_list.append(jnp.asarray(n, dtype=jnp.float32))
-                k_list.append(jnp.asarray(k, dtype=jnp.float32))
+                n_list.append(jnp.asarray(n, dtype=jnp.float64))
+                k_list.append(jnp.asarray(k, dtype=jnp.float64))
 
             self._set_attrs(tuple(wl_list), tuple(n_list), tuple(k_list), temp_tuple)
             self._save_to_database()
@@ -119,9 +119,9 @@ class Material:
         if stored_temps != temps_tuple:
             return None
         num = int(data['num_temps'])
-        wl_list = [jnp.array(data[f'wl_{i}'], dtype=jnp.float32) for i in range(num)]
-        n_list  = [jnp.array(data[f'n_{i}'], dtype=jnp.float32) for i in range(num)]
-        k_list  = [jnp.array(data[f'k_{i}'], dtype=jnp.float32) for i in range(num)]
+        wl_list = [jnp.array(data[f'wl_{i}'], dtype=jnp.float64) for i in range(num)]
+        n_list  = [jnp.array(data[f'n_{i}'], dtype=jnp.float64) for i in range(num)]
+        k_list  = [jnp.array(data[f'k_{i}'], dtype=jnp.float64) for i in range(num)]
         return tuple(wl_list), tuple(n_list), tuple(k_list)
 
     def _save_to_database(self):
@@ -228,7 +228,7 @@ class Material:
             return self
 
         # Convert to JAX array
-        new_temps_arr = jnp.array(new_temps, dtype=jnp.float32)
+        new_temps_arr = jnp.array(new_temps, dtype=jnp.float64)
 
         # Single batch call
         wl_tuple, n_tuple, k_tuple = batch_prediction_function(self, new_temps_arr)
@@ -314,9 +314,9 @@ class Material:
         Reconstruct a Material from a dictionary produced by to_dict().
         """
         # Convert lists back to JAX arrays
-        wl_tuple = tuple(jnp.array(wl, dtype=jnp.float32) for wl in data["_wavelengths"])
-        n_tuple = tuple(jnp.array(n, dtype=jnp.float32) for n in data["_n_values"])
-        k_tuple = tuple(jnp.array(k, dtype=jnp.float32) for k in data["_k_values"])
+        wl_tuple = tuple(jnp.array(wl, dtype=jnp.float64) for wl in data["_wavelengths"])
+        n_tuple = tuple(jnp.array(n, dtype=jnp.float64) for n in data["_n_values"])
+        k_tuple = tuple(jnp.array(k, dtype=jnp.float64) for k in data["_k_values"])
         temps_tuple = tuple(data["_temperatures"])
 
         # Create an "empty" Material (without files) and manually set the optical data

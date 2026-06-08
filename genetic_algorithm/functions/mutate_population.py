@@ -10,11 +10,11 @@ from specifications.objects.material import Material
 
 def mutate_population(
     pop: Population,
-    key: jax.random.PRNGKey,
+    key: jax.Array,
     material_database: List[Material],
     thickness_options: Thicknesses,
     mutation_rate: float = 0.1,
-) -> Tuple[jax.random.PRNGKey, Population]:
+) -> Tuple[jax.Array, Population]:
     """
     Apply one randomly chosen mutation per individual.
 

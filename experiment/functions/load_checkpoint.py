@@ -36,7 +36,7 @@ def load_checkpoint(
     active_mask_arr = jnp.array(bs["active_mask"], dtype=bool)
     best_structure = Structure(
         materials=jnp.array(bs["materials"], dtype=jnp.int8),
-        thicknesses_m=jnp.array(bs["thicknesses_m"], dtype=jnp.float32),
+        thicknesses_m=jnp.array(bs["thicknesses_m"], dtype=jnp.float64),
         active_mask=active_mask_arr,
         free_thickness_mask=jnp.array(bs["free_thickness_mask"], dtype=bool),
         free_material_mask=jnp.array(bs["free_material_mask"], dtype=bool),
@@ -57,7 +57,7 @@ def load_checkpoint(
     for item in state.get("best5", []):
         s = Structure(
             materials=jnp.array(item["materials"], dtype=jnp.int8),
-            thicknesses_m=jnp.array(item["thicknesses_m"], dtype=jnp.float32),
+            thicknesses_m=jnp.array(item["thicknesses_m"], dtype=jnp.float64),
             active_mask=jnp.array(item["active_mask"], dtype=bool),
             free_thickness_mask=jnp.array(item.get("free_thickness_mask", []), dtype=bool),
             free_material_mask=jnp.array(item.get("free_material_mask", []), dtype=bool),
