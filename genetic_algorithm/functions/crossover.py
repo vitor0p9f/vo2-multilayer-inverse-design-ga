@@ -32,10 +32,12 @@ def crossover_structures(
 
     P = len(parent_pairs)
 
-    # All parents share the same free masks
+    # All parents share the same free masks (use the first parent as reference)
     ref = parent_pairs[0][0]
-    free_mat_mask = ref.free_material_mask      # (L,)
-    free_thick_mask = ref.free_thickness_mask    # (L,)
+    free_mat_mask = ref.free_material_mask
+    free_thick_mask = ref.free_thickness_mask
+    # Layers where BOTH material and thickness are free → can swap active flag
+    fully_free_mask = ref.free_layers_mask   # This is now free_thick_mask & free_mat_mask
 
     # ------------------------------------------------------------------
     # 1.  Convert list of Structure pairs into batched arrays
@@ -64,23 +66,13 @@ def crossover_structures(
         do_cross = jax.random.bernoulli(cross_key, crossover_rate)
 
         def crossover_masks():
-            # Maximum possible cuts, clamped to L_local - 1
             max_cuts = jnp.minimum(n_cuts, L_local - 1)
-
-            # Random permutation of all possible cut positions 1..L-1
             all_pos = jnp.arange(1, L_local)
             perm = jax.random.permutation(cut_key, all_pos)
-
-            # Select the first max_cuts elements using a boolean mask
             mask = jnp.arange(L_local - 1) < max_cuts
-
-            # Scatter selected cuts into an indicator array (adds 1 at chosen positions)
             indicator = jnp.zeros(L_local, dtype=jnp.int32)
             indicator = indicator.at[perm].add(jnp.where(mask, 1, 0))
-
-            # Build segment IDs by cumulative sum
             seg_id = jnp.cumsum(indicator)
-
             mask1 = (seg_id % 2 == 0)
             mask2 = ~mask1
             return mask1, mask2
@@ -90,19 +82,17 @@ def crossover_structures(
 
         mask1, mask2 = lax.cond(do_cross, crossover_masks, no_crossover_masks)
 
-        free_active = free_mat_mask | free_thick_mask
-
-        # Materials (swap only where free_mat_mask is True)
+        # Materials: swap only where free_material_mask is True
         c1_mat = jnp.where(mask1 & free_mat_mask, mat1, mat2)
         c2_mat = jnp.where(mask2 & free_mat_mask, mat1, mat2)
 
-        # Thicknesses (swap only where free_thick_mask is True)
+        # Thicknesses: swap only where free_thickness_mask is True
         c1_thick = jnp.where(mask1 & free_thick_mask, thick1, thick2)
         c2_thick = jnp.where(mask2 & free_thick_mask, thick1, thick2)
 
-        # Active flag (swap for any free layer)
-        c1_act = jnp.where(mask1 & free_active, act1, act2)
-        c2_act = jnp.where(mask2 & free_active, act1, act2)
+        # Active flag: swap ONLY where the layer is fully free (both masks True)
+        c1_act = jnp.where(mask1 & fully_free_mask, act1, act2)
+        c2_act = jnp.where(mask2 & fully_free_mask, act1, act2)
 
         return c1_mat, c1_thick, c1_act, c2_mat, c2_thick, c2_act
 

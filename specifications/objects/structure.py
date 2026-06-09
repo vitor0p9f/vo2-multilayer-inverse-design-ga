@@ -19,4 +19,5 @@ class Structure:
 
     @property
     def free_layers_mask(self) -> Mask:
-        return self.free_thickness_mask | self.free_material_mask
+        """True only for layers where BOTH material and thickness are free."""
+        return self.free_thickness_mask & self.free_material_mask
