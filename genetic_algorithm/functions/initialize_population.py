@@ -1,12 +1,10 @@
 from typing import List, Tuple
+import jax
+from genetic_algorithm.objects.population import Population
 from template.objects.template import Template
 from specifications.objects.material import Material
-from specifications.objects.structure import Structure
 from specifications.types.structure import Thicknesses
 from template.functions.build_structure import build_random_structure_from_template
-from genetic_algorithm.objects.population import Population
-
-import jax
 
 def initialize_population(
     template: Template,
@@ -17,51 +15,46 @@ def initialize_population(
     allow_air_gap: bool = False,
 ) -> Tuple[jax.Array, Population]:
     """
-    Creates a population of random structures from a template.
+    Create a random initial population consistent with the template.
 
     Args:
-        template: Blueprint for layer structure.
-        key: JAX PRNG key (will be advanced).
-        materials: Available materials (order defines index). The material
-            with symbol "Air" (if present) can be excluded from free layers
-            via `allow_air_gap`.
-        thickness_options_m: Allowed discrete thicknesses in meters.
-        population_size: Number of structures to generate.
-        allow_air_gap: If False (default), the material "Air" is excluded
-            from random selection for free internal layers. The incidence
-            medium and substrate are never affected.
+        template:           Validated Template.
+        key:                JAX PRNG key.
+        materials:          List of Material objects.
+        thickness_options_m:1D array of allowed thicknesses (in metres).
+        population_size:    Number of individuals to generate.
+        allow_air_gap:      Whether the "Air" material may appear in free layers.
 
     Returns:
-        (next_key, population): The advanced PRNG key and the generated
-        Population object containing `population_size` individuals.
+        (next_key, population)
     """
-    # Advance the key: one for this function, one for future use
-    next_key, subkey = jax.random.split(key)
-
-    # Split the subkey into independent seeds for each individual
-    keys = jax.random.split(subkey, population_size)
-
-    # Function that builds one Structure from one key
-    def build_one(single_key: jax.Array) -> Structure:
-        _, struct = build_random_structure_from_template(
+    structures = []
+    next_key = key
+    for _ in range(population_size):
+        next_key, struct = build_random_structure_from_template(
             template=template,
-            key=single_key,
+            key=next_key,
             materials=materials,
             thickness_options_m=thickness_options_m,
             allow_air_gap=allow_air_gap,
         )
-        return struct
+        structures.append(struct)
 
-    # Vectorise over the key batch -> Structure with shape (pop_size, ...)
-    batched_struct = jax.vmap(build_one)(keys)
+    # Convert list of structures to batched Population arrays
+    materials_list = [s.materials for s in structures]
+    thicknesses_list = [s.thicknesses_m for s in structures]
+    active_list = [s.active_mask for s in structures]
 
-    # Wrap into dedicated Population type
+    # All individuals share the same free masks; take them from the first
+    free_mat_mask = structures[0].free_material_mask
+    free_thick_mask = structures[0].free_thickness_mask
+
     population = Population(
-        materials=batched_struct.materials,
-        thicknesses_m=batched_struct.thicknesses_m,
-        active_mask=batched_struct.active_mask,
-        free_thickness_mask=batched_struct.free_thickness_mask,
-        free_material_mask=batched_struct.free_material_mask,
+        materials=jax.numpy.stack(materials_list),
+        thicknesses_m=jax.numpy.stack(thicknesses_list),
+        active_mask=jax.numpy.stack(active_list),
+        free_thickness_mask=jax.numpy.stack([free_thick_mask] * population_size),
+        free_material_mask=jax.numpy.stack([free_mat_mask] * population_size),
     )
 
     return next_key, population

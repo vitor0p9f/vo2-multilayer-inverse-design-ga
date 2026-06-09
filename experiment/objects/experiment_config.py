@@ -40,6 +40,7 @@ class ExperimentConfig:
     materials: List[Material]
     thickness_options: Thicknesses
     template: Template
+    allow_air_gap: bool
 
     # Environment
     temperatures: Temperatures
@@ -85,7 +86,7 @@ class ExperimentConfig:
         return self._hash
 
     # ------------------------------------------------------------------
-    # Serialization (unchanged)
+    # Serialization
     # ------------------------------------------------------------------
     def to_dict(self) -> dict:
         return _to_json_compatible({
@@ -103,6 +104,7 @@ class ExperimentConfig:
             materials=[Material.from_dict(m) for m in data["materials"]],
             thickness_options=jnp.array(data["thickness_options"]),
             template=Template.from_dict(data["template"]),
+            allow_air_gap=data.get("allow_air_gap", False),
             temperatures=jnp.array(data["temperatures"]),
             wavelengths=jnp.array(data["wavelengths"]),
             angles=jnp.array(data["angles"]),

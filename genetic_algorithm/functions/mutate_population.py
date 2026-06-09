@@ -14,6 +14,7 @@ def mutate_population(
     material_database: List[Material],
     thickness_options: Thicknesses,
     mutation_rate: float = 0.1,
+    allow_air_gap: bool = False,
 ) -> Tuple[jax.Array, Population]:
     """
     Apply one randomly chosen mutation per individual.
@@ -38,12 +39,22 @@ def mutate_population(
         mutation_rate:       Overall mutation probability; also used as
                              per‑gene rate for material/thickness mutations
                              and for flipping active status in grow/shrink.
+        allow_air_gap:       If False (default), "Air" is excluded from
+                             material mutations.
 
     Returns:
         (next_key, mutated_population)
     """
-    # Material indices: 0 .. M-1
-    material_options = jnp.arange(len(material_database), dtype=jnp.int32)
+    # Build the set of allowed material indices for mutation
+    if not allow_air_gap:
+        # Exclude Air
+        allowed_mats = jnp.array(
+            [i for i, mat in enumerate(material_database) if mat.symbol != "Air"],
+            dtype=jnp.int32,
+        )
+    else:
+        allowed_mats = jnp.arange(len(material_database), dtype=jnp.int32)
+    num_allowed_mats = allowed_mats.shape[0]
 
     pop_size, L = pop.materials.shape
 
@@ -106,9 +117,11 @@ def mutate_population(
         def _material_mutation(mats, thicks, acts):
             mut_mask = jax.random.bernoulli(key_m, mutation_rate, shape=(L,))
             mut_mask = mut_mask & free_mat_mask
-            new_mats_idx = jax.random.randint(key_m, (L,), 0, len(material_options),
-                                              dtype=jnp.int32)
-            new_mats = material_options[new_mats_idx].astype(mats.dtype)
+            # Sample from allowed material indices
+            rand_sub_idx = jax.random.randint(
+                key_m, (L,), 0, num_allowed_mats, dtype=jnp.int32
+            )
+            new_mats = allowed_mats[rand_sub_idx].astype(mats.dtype)
             mats = jnp.where(mut_mask, new_mats, mats)
             return mats, thicks, acts
 
@@ -116,8 +129,9 @@ def mutate_population(
         def _thickness_mutation(mats, thicks, acts):
             mut_mask = jax.random.bernoulli(key_t, mutation_rate, shape=(L,))
             mut_mask = mut_mask & free_thick_mask
-            new_thicks_idx = jax.random.randint(key_t, (L,), 0, len(thickness_options),
-                                                dtype=jnp.int32)
+            new_thicks_idx = jax.random.randint(
+                key_t, (L,), 0, len(thickness_options), dtype=jnp.int32
+            )
             new_thicks = thickness_options[new_thicks_idx]
             thicks = jnp.where(mut_mask, new_thicks, thicks)
             return mats, thicks, acts
