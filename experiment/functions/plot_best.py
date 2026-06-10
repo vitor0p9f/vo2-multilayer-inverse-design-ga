@@ -93,8 +93,19 @@ def plot_best_structure(
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])   # leave room for suptitle
     if save_path:
-        plt.savefig(save_path, dpi=150)
+        plt.savefig(save_path, dpi=600)
     plt.show()
+
+
+def _get_contrast_text_color(bg_color):
+    """
+    Return 'black' or 'white' depending on the luminance of the background color.
+    Uses the standard relative luminance formula (sRGB coefficients).
+    """
+    r, g, b = bg_color[:3]  # ignore alpha if present
+    # Calculate relative luminance
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return 'black' if luminance > 0.5 else 'white'
 
 
 def _draw_structure(ax, structure: Structure, material_database: List[Material]) -> None:
@@ -122,10 +133,22 @@ def _draw_structure(ax, structure: Structure, material_database: List[Material])
     # Symbol for each displayed layer
     symbols = [material_database[int(idx)].symbol for idx in indices]
 
-    # Fixed colour per distinct material
-    unique_mats = list(set(indices.tolist()))
-    cmap = plt.cm.tab10
-    colour_dict = {mat: cmap(i % 10) for i, mat in enumerate(unique_mats)}
+    # --- Fixed colour mapping by material symbol ---
+    # Gather all unique symbols from the entire material database, preserving order
+    all_symbols = [mat.symbol for mat in material_database]
+    # Remove duplicates while keeping order of first occurrence
+    unique_symbols = list(dict.fromkeys(all_symbols))
+    # Use a perceptually uniform colormap, mapping each symbol to a fixed colour
+    cmap = plt.cm.tab20  # up to 20 distinct colours
+    n_unique = len(unique_symbols)
+    # For more than 20 materials, cycle the colormap with a slight offset
+    colour_dict = {}
+    for i, sym in enumerate(unique_symbols):
+        if n_unique <= 20:
+            colour_dict[sym] = cmap(i / max(1, n_unique - 1))
+        else:
+            # For >20, use a larger cycler (e.g., tab20 + tab20b) or just modulo
+            colour_dict[sym] = cmap(i % 20)
 
     # Labels: material symbol + thickness (or "semi‑infinite")
     labels = []
@@ -142,14 +165,15 @@ def _draw_structure(ax, structure: Structure, material_database: List[Material])
     layer_height = 1.5
     y_top = L_visible * layer_height
 
-    for lbl, idx in zip(labels, indices):
+    for lbl, sym in zip(labels, symbols):
         y_bottom = y_top - layer_height
-        colour = colour_dict[int(idx)]
+        colour = colour_dict[sym]
+        text_color = _get_contrast_text_color(colour)  # black or white for best visibility
         ax.bar(0, layer_height, bottom=y_bottom, width=bar_width,
                color=colour, edgecolor='k', linewidth=1.2)
         ax.text(0, y_bottom + layer_height / 2, lbl,
                 ha='center', va='center', fontsize=8, fontweight='bold',
-                color='white')
+                color=text_color)
         y_top = y_bottom
 
     ax.set_xlim(-1.0, 1.0)
