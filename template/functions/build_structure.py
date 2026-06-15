@@ -123,16 +123,18 @@ def build_random_structure_from_template(
     free_layer_count = sum(1 for m in mapping if m == Mapping.FREE_LAYER)
 
     # ----- 4. Randomly decide active free layers -----
-    next_key, key_mat, key_thick, key_act = jax.random.split(key, 4)
+    next_key, key_mat, key_thick, key_act_count, key_act_perm = jax.random.split(key, 5)
 
-    num_active_free = jax.random.randint(key_act, (), 0, free_layer_count + 1)
+    num_active_free = jax.random.randint(key_act_count, (), 0, free_layer_count + 1)
 
     active_mask = jnp.ones(n_layers, dtype=bool)
-    free_idx = 0
-    for i, m in enumerate(mapping):
-        if m == Mapping.FREE_LAYER:
-            active_mask = active_mask.at[i].set(free_idx < num_active_free)
-            free_idx += 1
+    free_positions = jnp.array([i for i, m in enumerate(mapping) if m == Mapping.FREE_LAYER], dtype=jnp.int32)
+    if free_layer_count > 0:
+        active_mask = active_mask.at[free_positions].set(False)
+        if num_active_free > 0:
+            perm = jax.random.permutation(key_act_perm, free_layer_count)
+            selected = perm[:num_active_free]
+            active_mask = active_mask.at[free_positions[selected]].set(True)
 
     # ----- 5. Generate random materials (respecting allow_air_gap) -----
     if not allow_air_gap and "Air" in symbol_to_idx:
