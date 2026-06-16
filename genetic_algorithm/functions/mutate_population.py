@@ -47,7 +47,6 @@ def mutate_population(
     """
     # Build the set of allowed material indices for mutation
     if not allow_air_gap:
-        # Exclude Air
         allowed_mats = jnp.array(
             [i for i, mat in enumerate(material_database) if mat.symbol != "Air"],
             dtype=jnp.int32,
@@ -61,11 +60,18 @@ def mutate_population(
     # Masks are identical for all individuals
     free_mat_mask = pop.free_material_mask[0]      # (L,)
     free_thick_mask = pop.free_thickness_mask[0]    # (L,)
-    fully_free_mask = free_mat_mask & free_thick_mask  # only layers free in both aspects
+    fully_free_mask = free_mat_mask & free_thick_mask
 
-    # Precompute indices of fully free layers (for scramble / grow-shrink)
-    fully_free_indices = jnp.arange(L)[fully_free_mask]   # (num_fully_free,)
+    # Indices of fully free layers (may be empty)
+    fully_free_indices = jnp.arange(L)[fully_free_mask]
     num_fully_free = fully_free_indices.shape[0]
+
+    # Pad the indices to have at least one element (dummy 0)
+    # to avoid static indexing errors during tracing.
+    pad_width = jnp.maximum(0, 1 - num_fully_free)
+    safe_fully_free_indices = jnp.pad(
+        fully_free_indices, (0, pad_width), constant_values=0
+    )
 
     # ------------------------------------------------------------------
     # 1.  Per‑individual subkeys
@@ -88,36 +94,46 @@ def mutate_population(
 
         # ---- 0: Scramble free layers ----
         def _scramble(mats, thicks, acts):
-            # Scramble only among fully free layers
-            free_mats = mats[fully_free_mask]
-            free_thicks = thicks[fully_free_mask]
-            free_acts = acts[fully_free_mask]
-            perm = jax.random.permutation(key_s, num_fully_free)
-            mats = mats.at[fully_free_mask].set(free_mats[perm])
-            thicks = thicks.at[fully_free_mask].set(free_thicks[perm])
-            acts = acts.at[fully_free_mask].set(free_acts[perm])
-            return mats, thicks, acts
+            sum_fully_free = jnp.sum(fully_free_mask)
 
-        # ---- 1: Grow / Shrink ----
+            def do_scramble():
+                free_mats = mats[fully_free_mask]
+                free_thicks = thicks[fully_free_mask]
+                free_acts = acts[fully_free_mask]
+                perm = jax.random.permutation(key_s, num_fully_free)
+                new_mats = mats.at[fully_free_mask].set(free_mats[perm])
+                new_thicks = thicks.at[fully_free_mask].set(free_thicks[perm])
+                new_acts = acts.at[fully_free_mask].set(free_acts[perm])
+                return new_mats, new_thicks, new_acts
+
+            return lax.cond(sum_fully_free > 0, do_scramble, lambda: (mats, thicks, acts))
+
+        # ---- 1: Grow / Shrink (safe against zero fully free) ----
         def _grow_shrink(mats, thicks, acts):
-            flip = jax.random.bernoulli(key_g, mutation_rate, shape=(L,))
-            flip = flip & fully_free_mask   # only fully free layers can toggle
-            new_acts = acts ^ flip
+            sum_fully_free = jnp.sum(fully_free_mask)
 
-            # Ensure at least one fully free layer remains active
-            num_active = jnp.sum(new_acts & fully_free_mask)
-            chosen = jax.random.randint(key_g, (), 0, num_fully_free)
-            layer_to_activate = fully_free_indices[chosen]
-            new_acts = jnp.where(num_active == 0,
-                                 new_acts.at[layer_to_activate].set(True),
-                                 new_acts)
-            return mats, thicks, new_acts
+            def do_grow_shrink():
+                flip = jax.random.bernoulli(key_g, mutation_rate, shape=(L,))
+                flip = flip & fully_free_mask
+                new_acts = acts ^ flip
 
-        # ---- 2: Material mutation (per free‑material layer) ----
+                # Ensure at least one fully free layer remains active
+                num_active = jnp.sum(new_acts & fully_free_mask)
+                chosen = jax.random.randint(key_g, (), 0, num_fully_free)
+                layer_to_activate = safe_fully_free_indices[chosen]
+                new_acts = jnp.where(
+                    num_active == 0,
+                    new_acts.at[layer_to_activate].set(True),
+                    new_acts,
+                )
+                return mats, thicks, new_acts
+
+            return lax.cond(sum_fully_free > 0, do_grow_shrink, lambda: (mats, thicks, acts))
+
+        # ---- 2: Material mutation ----
         def _material_mutation(mats, thicks, acts):
             mut_mask = jax.random.bernoulli(key_m, mutation_rate, shape=(L,))
             mut_mask = mut_mask & free_mat_mask
-            # Sample from allowed material indices
             rand_sub_idx = jax.random.randint(
                 key_m, (L,), 0, num_allowed_mats, dtype=jnp.int32
             )
@@ -125,7 +141,7 @@ def mutate_population(
             mats = jnp.where(mut_mask, new_mats, mats)
             return mats, thicks, acts
 
-        # ---- 3: Thickness mutation (per free‑thickness layer) ----
+        # ---- 3: Thickness mutation ----
         def _thickness_mutation(mats, thicks, acts):
             mut_mask = jax.random.bernoulli(key_t, mutation_rate, shape=(L,))
             mut_mask = mut_mask & free_thick_mask
