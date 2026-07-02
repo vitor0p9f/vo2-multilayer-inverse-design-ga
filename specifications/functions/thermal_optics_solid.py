@@ -33,8 +33,11 @@ def predict_temperature_based_k(
     Returns (k_predicted, delta_k).
     """
     delta_T = target_temperature - reference_temperature
-    delta_k = reference_k * (-3.0 * linear_cte) * delta_T
-    k_pred = reference_k + delta_k
+    gamma = 3.0 * linear_cte
+    
+    # Exponential model
+    k_pred = reference_k * jnp.exp(-gamma * delta_T)
+    delta_k = k_pred - reference_k
     return k_pred, delta_k
 
 
